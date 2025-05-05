@@ -1,0 +1,50 @@
+SEQ
+# Interface simples
+output("==== Ordenação com Quicksort ====")
+output("Insira 3 números (valores fixos para simulação):")
+
+a = 9
+b = 2
+c = 7
+
+output("Vetor original:")
+output(a)
+output(b)
+output(c)
+
+# Função auxiliar: mínimo entre dois
+function min2(x, y)
+    if (x < y) return x;
+    else return y;
+
+# Função auxiliar: máximo entre dois
+function max2(x, y)
+    if (x > y) return x;
+    else return y;
+
+# Função de ordenação de 3 elementos (sem recursão real)
+function quicksort3(x, y, z)
+    # Primeiro nível: encontrar menor, médio e maior
+    m1 = min2(x, y)
+    m2 = max2(x, y)
+
+    if (z < m1)
+        menor = z;
+        medio = m1;
+        maior = m2;
+    else if (z > m2)
+        menor = m1;
+        medio = m2;
+        maior = z;
+    else
+        menor = m1;
+        medio = z;
+        maior = m2;
+
+    output("Vetor ordenado:")
+    output(menor)
+    output(medio)
+    output(maior)
+
+# Chamada da função
+quicksort3(a, b, c)

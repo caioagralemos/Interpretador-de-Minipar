@@ -1,0 +1,37 @@
+SEQ
+# Declaração do canal de comunicação
+c_channel calculadora "localhost" 8585;
+
+# Bloco sequencial no cliente
+SEQ
+output("Digite a operação: +, -, *, /");
+op = input();
+
+output("Digite o primeiro valor:");
+val1 = input();
+
+output("Digite o segundo valor:");
+val2 = input();
+
+send(op, calculadora);
+send(val1, calculadora);
+send(val2, calculadora);
+
+res = receive(calculadora);
+output("Resultado: ");
+output(res);
+
+# Bloco paralelo no servidor (poderia estar em outro programa)
+PAR
+op = receive(calculadora);
+val1 = receive(calculadora);
+val2 = receive(calculadora);
+
+# O interpretador deve lidar com casting, por exemplo, transformar strings em int aqui
+res = 0;
+if (op == "+") res = val1 + val2;
+else if (op == "-") res = val1 - val2;
+else if (op == "*") res = val1 * val2;
+else if (op == "/") res = val1 / val2;
+
+send(res, calculadora);

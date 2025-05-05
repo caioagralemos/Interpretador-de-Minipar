@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "minipar"
+version = "0.1.0"
+description = ""
+authors = ["ThiagoORuby <trs@ic.ufal.br>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.10.0"
+isort = "^5.13.2"
+cx-freeze = "^7.2.5"
+
+[tool.isort]
+profile = "black"
+known_first_party = "poetry"
+
+[tool.black]
+line-length = 79
+skip-string-normalization = true
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

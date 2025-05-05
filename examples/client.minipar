@@ -1,0 +1,15 @@
+/* cliente */
+
+c_channel client {"localhost", 8585}
+
+while(true){
+  entrada: string = input("Digite uma expressão: ")
+  if (entrada == "exit")
+  {
+    break
+  }
+  ret: string = client.send(entrada)
+  print(ret)
+}
+
+client.close()
