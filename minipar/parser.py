@@ -98,29 +98,35 @@ class Parser(IParser):
             )
 
     def bloco_SEQ(self) -> ast.Node:
-        """
-        <bloco_SEQ> ::= "SEQ" '{' <stmts> '}' | "SEQ" <stmts>
-        """
         self.match("SEQ")
+        stmts = []
         if self.lookahead.tag == "LBRACE":
             self.match("LBRACE")
             stmts = self.stmts()
             self.match("RBRACE")
         else:
-            stmts = self.stmts()
+            # Permite múltiplas instruções até encontrar um bloco ou EOF
+            while self.lookahead.tag not in {"SEQ", "PAR", "EOF", "RBRACE"}:
+                if self.lookahead.tag == "SEMICOLON":
+                    self.match("SEMICOLON")
+                    continue
+                stmts.append(self.stmt())
         return ast.Seq(body=stmts)
 
     def bloco_PAR(self) -> ast.Node:
-        """
-        <bloco_PAR> ::= "PAR" '{' <stmts> '}' | "PAR" <stmts>
-        """
         self.match("PAR")
+        stmts = []
         if self.lookahead.tag == "LBRACE":
             self.match("LBRACE")
             stmts = self.stmts()
             self.match("RBRACE")
         else:
-            stmts = self.stmts()
+            # Permite múltiplas instruções até encontrar um bloco ou EOF
+            while self.lookahead.tag not in {"SEQ", "PAR", "EOF", "RBRACE"}:
+                if self.lookahead.tag == "SEMICOLON":
+                    self.match("SEMICOLON")
+                    continue
+                stmts.append(self.stmt())
         return ast.Par(body=stmts)
 
     def stmts(self) -> list[ast.Node]:
@@ -134,87 +140,35 @@ class Parser(IParser):
             if self.lookahead.tag == "SEMICOLON":
                 self.match("SEMICOLON")
                 continue
+            # Não consome NUMBER isolado aqui!
             stmts.append(self.stmt())
         return stmts
 
     def stmt(self) -> ast.Node:
         """
-        <stmt> ::= <var_decl> ";" 
-                 | <atrib> ";" 
-                 | <if_stmt> 
-                 | <while_stmt> 
-                 | <send_stmt> ";" 
-                 | <receive_stmt> ";" 
-                 | <output_stmt> ";" 
-                 | <func_decl> 
-                 | <func_call> ";"
-                 | <c_channel_decl> ";"  # Adicionado suporte para c_channel
-                 | <s_channel_decl> ";"  # Adicionado suporte para s_channel
-                 | <bloco_SEQ>  # Adicionado suporte para blocos SEQ aninhados
-                 | <bloco_PAR>  # Adicionado suporte para blocos PAR aninhados
-                 | "break" ";"  # Adicionado suporte para break
-                 | "continue" ";"  # Adicionado suporte para continue
+        <stmt> ::= <var_decl>
+                | <atrib_or_func_call>
+                | <if_stmt>
+                | <while_stmt>
+                | <send_stmt>
+                | <receive_stmt>
+                | <output_stmt>
+                | <func_decl>
+                | <bloco_stmt>
         """
-        # Aceitar tokens em caixa alta e baixa
         if self.lookahead.tag in {"STRING_TYPE", "INT_TYPE", "BOOL_TYPE", "C_CHANNEL"}:
-            stmt = self.var_decl()
-            self.match("SEMICOLON")
-            return stmt
-        elif self.lookahead.tag == "BREAK":
-            self.match("BREAK")
-            self.match("SEMICOLON")
-            return ast.Break()
-        elif self.lookahead.tag == "CONTINUE":
-            self.match("CONTINUE")
-            self.match("SEMICOLON")
-            return ast.Continue()
-        elif self.lookahead.tag == "S_CHANNEL":
-            stmt = self.s_channel_decl()
-            self.match("SEMICOLON")
-            return stmt
+            return self.var_decl()
         elif self.lookahead.tag == "ID":
-            # Verifica se é declaração do tipo ID : tipo
-            current_token = self.lookahead
-            # Salva estado atual do lexer
-            saved_lookahead = self.lookahead
-            saved_lineno = self.lineno
-            try:
-                # Avança para ver se é ':'
-                self.match("ID")
-                if self.lookahead.tag == ":":
-                    # Volta para o estado anterior e chama var_decl
-                    self.lookahead = current_token
-                    self.lineno = saved_lineno
-                    stmt = self.var_decl()
-                    self.match("SEMICOLON")
-                    return stmt
-                else:
-                    # Volta para o estado anterior e faz atribuição/chamada
-                    self.lookahead = current_token
-                    self.lineno = saved_lineno
-                    stmt = self.atrib_or_func_call()
-                    self.match("SEMICOLON")
-                    return stmt
-            except Exception:
-                # Em caso de erro, volta para o estado anterior
-                self.lookahead = current_token
-                self.lineno = saved_lineno
-                raise
+            return self.atrib_or_func_call()
         elif self.lookahead.tag == "IF":
             return self.if_stmt()
         elif self.lookahead.tag == "WHILE":
             return self.while_stmt()
-        elif self.lookahead.tag == "ELSE":
-            raise err.SyntaxError(self.lineno, "'else' sem 'if' correspondente")
-        elif self.lookahead.tag in {"send", "SEND"}:
-            stmt = self.send_stmt()
-            self.match("SEMICOLON")
-            return stmt
-        elif self.lookahead.tag in {"receive", "RECEIVE"}:
-            stmt = self.receive_stmt()
-            self.match("SEMICOLON")
-            return stmt
-        elif self.lookahead.tag in {"output", "OUTPUT"}:
+        elif self.lookahead.tag == "SEND":
+            return self.send_stmt()
+        elif self.lookahead.tag == "RECEIVE":
+            return self.receive_stmt()
+        elif self.lookahead.tag == "OUTPUT":
             stmt = self.output_stmt()
             self.match("SEMICOLON")
             return stmt
@@ -224,6 +178,17 @@ class Parser(IParser):
             return self.bloco_SEQ()  # Não exige ponto e vírgula após bloco
         elif self.lookahead.tag == "PAR":
             return self.bloco_PAR()  # Não exige ponto e vírgula após bloco
+        elif self.lookahead.tag == "INPUT":
+            # Permite instrução input(); como expressão isolada
+            name = self.lookahead.value
+            self.match("INPUT")
+            if self.lookahead.tag == "LPAREN":
+                args = self.arg_list()
+                node = ast.Call(type=None, token=Token("INPUT", name), args=args)
+            else:
+                node = ast.ID(type=None, token=Token("INPUT", name))
+            self.match("SEMICOLON")
+            return node
         else:
             raise err.SyntaxError(
                 self.lineno, f"Instrução inválida: {self.lookahead.value}"
@@ -319,13 +284,27 @@ class Parser(IParser):
         self.match("ID")
         if self.lookahead.tag == "ASSIGN":
             self.match("ASSIGN")
-            expr = self.expr()
-            return ast.Assign(left=ast.ID(type=None, token=Token("ID", name)), right=expr)
+            if self.lookahead.tag == "INPUT":
+                # Handle input() in assignment
+                self.match("INPUT")
+                if self.lookahead.tag == "LPAREN":
+                    args = self.arg_list()
+                    expr = ast.Call(type=None, token=Token("INPUT", "input"), args=args)
+                else:
+                    expr = ast.ID(type=None, token=Token("INPUT", "input"))
+                self.match("SEMICOLON")
+                return ast.Assign(left=ast.ID(type=None, token=Token("ID", name)), right=expr)
+            else:
+                expr = self.expr()
+                self.match("SEMICOLON")
+                return ast.Assign(left=ast.ID(type=None, token=Token("ID", name)), right=expr)
         elif self.lookahead.tag == "LPAREN":
             args = self.arg_list()
+            self.match("SEMICOLON")
             return ast.Call(type=None, token=Token("ID", name), args=args)
         else:
             # Permite instruções como apenas 'id;' (ex: declaração sem inicialização)
+            self.match("SEMICOLON")
             return ast.ID(type=None, token=Token("ID", name))
 
     def if_stmt(self) -> ast.Node:
