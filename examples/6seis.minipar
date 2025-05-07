@@ -1,60 +1,51 @@
 SEQ {
 # Interface simples
-output("Insira 3 números (valores fixos para simulação):");
+output("Insira 3 números:");
 
-a = 9;
-b = 2;
-c = 7;
+output("Digite o primeiro número:");
+a = input();
+
+output("Digite o segundo número:");
+b = input();
+
+output("Digite o terceiro número:");
+c = input();
 
 output("Vetor original:");
 output(a);
 output(b);
 output(c);
 
-# Função auxiliar: mínimo entre dois
-function min2(x, y) {
-    if (x < y) {
-        return x;
-    } else {
-        return y;
-    }
+# Ordenação dos números
+# Encontrar o menor valor
+if (a <= b && a <= c) {
+    menor = a;
+} else if (b <= a && b <= c) {
+    menor = b;
+} else {
+    menor = c;
 }
 
-# Função auxiliar: máximo entre dois
-function max2(x, y) {
-    if (x > y) {
-        return x;
-    } else {
-        return y;
-    }
+# Encontrar o maior valor
+if (a >= b && a >= c) {
+    maior = a;
+} else if (b >= a && b >= c) {
+    maior = b;
+} else {
+    maior = c;
 }
 
-# Função de ordenação de 3 elementos (sem recursão real)
-function quicksort3(x, y, z) {
-    # Primeiro nível: encontrar menor, médio e maior
-    m1 = min2(x, y);
-    m2 = max2(x, y);
-
-    if (z < m1) {
-        menor = z;
-        medio = m1;
-        maior = m2;
-    } else if (z > m2) {
-        menor = m1;
-        medio = m2;
-        maior = z;
-    } else {
-        menor = m1;
-        medio = z;
-        maior = m2;
-    }
-
-    output("Vetor ordenado:");
-    output(menor);
-    output(medio);
-    output(maior);
+# Encontrar o valor do meio por eliminação
+if (a != menor && a != maior) {
+    medio = a;
+} else if (b != menor && b != maior) {
+    medio = b;
+} else {
+    medio = c;
 }
 
-# Chamada da função
-quicksort3(a, b, c);
+output("Vetor ordenado:");
+output(menor);
+output(medio);
+output(maior);
 }

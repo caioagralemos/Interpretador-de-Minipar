@@ -1,9 +1,14 @@
 SEQ {
 # Interface simples
-output("Insira 3 números (valores fixos para simulação):");
+output("Insira 3 números:");
 
-a = 9;
-b = 2;
+output("Digite o primeiro número:");
+a = input();
+
+output("Digite o segundo número:");
+b = input();
+
+output("Digite o terceiro número:");
 c = 7;
 
 output("Vetor original:");

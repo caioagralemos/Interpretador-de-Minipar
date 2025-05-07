@@ -52,6 +52,7 @@ def main():
         "-ast", action="store_true", help="get Abstract Syntax Tree (AST)"
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="display verbose output")
+    parser.add_argument("-r", "--raw", action="store_true", help="execute raw code without special example detection")
     parser.add_argument("name", type=str, help="program read from script file")
 
     args = parser.parse_args()
@@ -59,8 +60,8 @@ def main():
     with open(args.name, "r") as f:
         data = f.read()
     
-    # Determine if this is a special example file
-    example_type = detect_example_type(args.name, data)
+    # Determine if this is a special example file (skip if --raw flag is used)
+    example_type = None if args.raw else detect_example_type(args.name, data)
     
     # Preprocess the code to standardize syntax
     processed_data = preprocess(data)
@@ -116,7 +117,7 @@ def main():
             semantic.visit(ast)
             # Execução
             executor = Executor()
-            executor.run(ast)
+            executor.run(ast, skip_detection=args.raw)
         except Exception as e:
             print(f"Error: {e}")
             if args.verbose:
