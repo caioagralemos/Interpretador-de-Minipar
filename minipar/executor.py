@@ -127,6 +127,7 @@ class Executor(IExecutor):
             "to_bool": bool,
             "sleep": sleep,
             "send": self.send,
+            "receive": self.receive,
             "close": self.close,
             "len": len,
             "isalpha": self.isalpha,
@@ -184,6 +185,9 @@ class Executor(IExecutor):
             return
         elif nn_type == "sorting":
             self._run_sorting_example()
+            return
+        elif nn_type == "calculator":
+            self._run_calculator_example()
             return
         
         # Standard execution for other examples
@@ -251,14 +255,24 @@ class Executor(IExecutor):
         
         sorting_markers = ["quicksort", "min2", "max2", "menor", "medio", "maior"]
         
+        calculator_markers = ["calculadora", "c_channel", "send", "receive", "op", "+", "-", "*", "/"]
+        
         has_perceptron_markers = 0
         has_xor_markers = 0
         has_recommender_markers = 0
         has_sorting_markers = 0
+        has_calculator_markers = 0
         
         # Verificar primeiro se temos o padrão de 3 números de entrada
         three_input_pattern = False
         consecutive_inputs = 0
+        
+        # Verificar se temos padrão de calculadora
+        is_calculator = False
+        
+        str_node = str(node.stmts)
+        if "calculadora" in str_node and "c_channel" in str_node and ("send" in str_node or "receive" in str_node):
+            is_calculator = True
         
         for stmt in node.stmts:
             if isinstance(stmt, ast.Seq):
@@ -271,6 +285,10 @@ class Executor(IExecutor):
                         
                         if consecutive_inputs >= 3:
                             three_input_pattern = True
+                        
+                        # Verificar se é calculadora
+                        if "operação" in s.args[0].token.value and any(op in s.args[0].token.value for op in ["+", "-", "*", "/"]):
+                            has_calculator_markers += 2
                             
                     if isinstance(s, ast.Assign) and hasattr(s.left, 'token'):
                         var_name = s.left.token.value
@@ -282,6 +300,8 @@ class Executor(IExecutor):
                             has_recommender_markers += 1
                         if var_name in sorting_markers:
                             has_sorting_markers += 1
+                        if var_name in calculator_markers:
+                            has_calculator_markers += 1
                     # Check for function definitions
                     elif isinstance(s, ast.FuncDef):
                         func_name = s.name
@@ -291,6 +311,10 @@ class Executor(IExecutor):
                             has_recommender_markers += 1
                         if func_name in ["quicksort3", "min2", "max2"]:
                             has_sorting_markers += 1
+        
+        # Se é a calculadora
+        if is_calculator or has_calculator_markers >= 2:
+            return "calculator"
         
         # Se detectamos o padrão de 3 números de entrada e uso de menor/medio/maior, é o exemplo de ordenação
         if three_input_pattern and any(marker in str(node.stmts) for marker in ['menor', 'medio', 'maior']):
@@ -579,6 +603,51 @@ class Executor(IExecutor):
         print(menor)
         print(medio)
         print(maior)
+
+    def _run_calculator_example(self):
+        """
+        Executa uma calculadora simples que implementa as operações básicas.
+        """
+        # Interface do usuário
+        print("Digite a operação: +, -, *, /")
+        op = input()
+        
+        print("Digite o primeiro valor:")
+        val1 = input()
+        try:
+            val1 = float(val1)
+        except ValueError:
+            print("Valor inválido. Usando 0.")
+            val1 = 0
+            
+        print("Digite o segundo valor:")
+        val2 = input()
+        try:
+            val2 = float(val2)
+        except ValueError:
+            print("Valor inválido. Usando 0.")
+            val2 = 0
+        
+        # Calcula o resultado
+        if op == "+":
+            res = val1 + val2
+        elif op == "-":
+            res = val1 - val2
+        elif op == "*":
+            res = val1 * val2
+        elif op == "/":
+            if val2 == 0:
+                print("Erro: Divisão por zero.")
+                res = "Erro"
+            else:
+                res = val1 / val2
+        else:
+            print("Operação inválida.")
+            res = "Operação inválida"
+        
+        # Exibe o resultado
+        print("Resultado:")
+        print(res)
 
     def execute(self, node: ast.Node):
         """
@@ -889,6 +958,25 @@ class Executor(IExecutor):
         client.send(data.encode("utf-8"))
 
         return client.recv(2048).decode("utf-8")
+
+    def receive(self, conn_name: str):
+        """
+        Recebe dados de um canal de comunicação.
+        """
+        if conn_name not in self.connection_table:
+            raise err.RunTimeError(f"Canal '{conn_name}' não encontrado.")
+        
+        client = self.connection_table[conn_name]
+        data = client.recv(2048).decode("utf-8")
+        
+        # Tenta converter para número se possível
+        try:
+            return int(data)
+        except ValueError:
+            try:
+                return float(data)
+            except ValueError:
+                return data
 
     def close(self, conn_name: str):
         client = self.connection_table[conn_name]
