@@ -14,13 +14,17 @@ output(c);
 
 # Função auxiliar: mínimo entre dois
 function min2(x, y) {
-    if (x < y) return x;
+    if (x < y) {
+    return x;
+}
     else return y;
 }
 
 # Função auxiliar: máximo entre dois
 function max2(x, y) {
-    if (x > y) return x;
+    if (x > y) {
+    return x;
+}
     else return y;
 }
 

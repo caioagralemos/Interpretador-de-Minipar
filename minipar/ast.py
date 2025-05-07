@@ -178,3 +178,7 @@ class Break(Statement):
 @dataclass
 class Continue(Statement):
     pass
+
+@dataclass
+class Return(Statement):
+    expr: Union[Expression, None] = None
