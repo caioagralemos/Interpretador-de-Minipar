@@ -31,6 +31,29 @@ def preprocess(code: str) -> str:
         if not code.rstrip().endswith('}'):
             code = code.rstrip() + '\n}'
     
+    # Special handling for multiple variable assignments on the same line
+    # Find declarations like: var1 = 0.1; var2 = 0.2; var3 = 0.3;
+    # And convert them to separate lines
+    lines = []
+    for line in code.split('\n'):
+        # Check for multiple assignments (with ; separating them)
+        if "=" in line and ";" in line and not line.strip().startswith('#'):
+            # Split the assignments
+            parts = line.split(';')
+            for part in parts:
+                if "=" in part:
+                    # Preserve indentation
+                    indent = len(part) - len(part.lstrip())
+                    part = part.strip()
+                    if part:  # Skip empty parts
+                        lines.append(' ' * indent + part + ';')
+                elif part.strip():  # Non-empty part without assignment
+                    lines.append(part + ';')
+        else:
+            lines.append(line)
+    
+    code = '\n'.join(lines)
+    
     # Special handling for the neural network example
     if "function activation(x)" in code and "input_val" in code and "learning_rate" in code:
         # Rebuild the entire file with proper formatting
@@ -116,7 +139,12 @@ def preprocess(code: str) -> str:
         
         code = '\n'.join(processed_lines)
     
-    # Add braces to function bodies
+    # Fix function declarations
+    # First, find function declarations that end with return statement
+    code = re.sub(r'function\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)(?:\s*{)?([^{]*?)return ([^;]+);(?:\s*})?', 
+                 r'function \1(\2) {\n    return \4;\n}', code, flags=re.DOTALL)
+    
+    # Handle other function declarations
     def fix_function(match):
         func_decl = match.group(1)
         param = match.group(2) if match.group(2) else ""
@@ -128,7 +156,7 @@ def preprocess(code: str) -> str:
         return match.group(0)
     
     # Match function declarations with their body
-    code = re.sub(r'function\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)(.*?;)', fix_function, code, flags=re.DOTALL)
+    code = re.sub(r'function\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)([^{](.*?);)', fix_function, code, flags=re.DOTALL)
     
     # Add braces to if statements without them
     def fix_if(match):

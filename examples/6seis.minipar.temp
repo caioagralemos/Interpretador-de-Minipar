@@ -1,6 +1,5 @@
-SEQ
+SEQ {
 # Interface simples
-output("==== Ordenação com Quicksort ====");
 output("Insira 3 números (valores fixos para simulação):");
 
 a = 9;
@@ -15,17 +14,19 @@ output(c);
 # Função auxiliar: mínimo entre dois
 function min2(x, y) {
     if (x < y) {
-    return x;
-}
-    else return y;
+        return x;
+    } else {
+        return y;
+    }
 }
 
 # Função auxiliar: máximo entre dois
 function max2(x, y) {
     if (x > y) {
-    return x;
-}
-    else return y;
+        return x;
+    } else {
+        return y;
+    }
 }
 
 # Função de ordenação de 3 elementos (sem recursão real)
@@ -56,3 +57,4 @@ function quicksort3(x, y, z) {
 
 # Chamada da função
 quicksort3(a, b, c);
+}

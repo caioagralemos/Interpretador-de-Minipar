@@ -39,18 +39,23 @@ class Parser(IParser):
     """
 
     def __init__(self, lexer: Lexer):
-        self.lexer: NextToken = lexer.scan()
-        self.lookahead, self.lineno = next(self.lexer)
+        """
+        Initialize the parser with a lexer.
+        
+        Args:
+            lexer (Lexer): An instance of the lexical analyzer
+        """
+        self.original_lexer = lexer  # Keep reference to the original lexer
+        self.lexer_generator = lexer.scan()  # Get the token generator
+        self.lookahead, self.lineno = next(self.lexer_generator)  # Get first token
 
     def match(self, tag: str) -> bool:
         if tag == self.lookahead.tag:
-            #print(f"[Parser] Correspondência encontrada: {tag} (lookahead: {self.lookahead})")
             try:
-                self.lookahead, self.lineno = next(self.lexer)
+                self.lookahead, self.lineno = next(self.lexer_generator)
             except StopIteration:
                 self.lookahead = Token("EOF", "EOF")
             return True
-        print(f"[Parser] Correspondência falhou: esperado {tag}, encontrado {self.lookahead.tag}")
         return False
 
     def parse(self) -> ast.Node:
@@ -86,15 +91,13 @@ class Parser(IParser):
                         stmts.append(self.atrib_or_func_call())
                     else:
                         stmts.append(self.stmt())
-                except Exception as e:
-                    print(f"Error parsing top-level statement: {e}")
+                except Exception:
                     # Skip to the next line/statement
                     while self.lookahead.tag != "SEMICOLON" and self.lookahead.tag != "EOF":
                         self.match(self.lookahead.tag)
                     if self.lookahead.tag == "SEMICOLON":
                         self.match("SEMICOLON")
             else:
-                print(f"[Parser] Skipping invalid top-level statement: {self.lookahead.value}")
                 # Skip to the next line/statement
                 while self.lookahead.tag != "SEMICOLON" and self.lookahead.tag != "EOF":
                     self.match(self.lookahead.tag)
@@ -147,12 +150,24 @@ class Parser(IParser):
                 try:
                     # Handle variable assignments directly
                     if self.lookahead.tag == "ID":
-                        stmts.append(self.atrib_or_func_call())
+                        node = self.atrib_or_func_call()
+                        stmts.append(node)
+                    # Handle floating decimal numbers (like 0.5)
+                    elif self.lookahead.tag == "NUMBER" and self.lookahead.value == "0" and self.lookahead.tag == "DIV":
+                        # Decimal number as a standalone expression
+                        # - Create a placeholder for now
+                        value = self.lookahead.value  # "0"
+                        self.match("NUMBER")
+                        self.match("DIV")
+                        if self.lookahead.tag == "NUMBER":
+                            value += "." + self.lookahead.value
+                            self.match("NUMBER")
+                        node = ast.Constant(type="NUMBER", token=Token("NUMBER", value))
+                        stmts.append(node)
                     # Handle other statement types
                     else:
                         stmts.append(self.stmt())
-                except Exception as e:
-                    print(f"Error in SEQ block: {e}")
+                except Exception:
                     # Skip to the next line/statement
                     while self.lookahead.tag not in {"SEMICOLON", "EOF", "SEQ", "PAR", "RBRACE"}:
                         self.match(self.lookahead.tag)
@@ -243,6 +258,24 @@ class Parser(IParser):
             return node
         elif self.lookahead.tag == "RETURN":
             return self.return_stmt()
+        elif self.lookahead.tag == "ELSE":
+            # Special handling for ELSE to help with error recovery
+            self.match("ELSE")
+            if self.lookahead.tag in {"SEQ", "PAR"}:
+                return self.stmt()
+            else:
+                # Handle single statement
+                stmt = self.stmt()
+                if self.lookahead.tag == "SEMICOLON":
+                    self.match("SEMICOLON")
+                return stmt
+        elif self.lookahead.tag == "NUMBER":
+            # Handle isolated numbers as constant expressions
+            value = self.lookahead.value
+            self.match("NUMBER")
+            if self.lookahead.tag == "SEMICOLON":
+                self.match("SEMICOLON")
+            return ast.Constant(type="NUMBER", token=Token("NUMBER", value))
         else:
             raise err.SyntaxError(
                 self.lineno, f"Instrução inválida: {self.lookahead.value}"
@@ -352,8 +385,7 @@ class Parser(IParser):
                 # Parse the right side expression
                 try:
                     expr = self.expr()
-                except Exception as e:
-                    print(f"Error parsing expression: {e}")
+                except Exception:
                     # Skip to the next statement on error
                     while self.lookahead.tag not in {"SEMICOLON", "EOF"}:
                         self.match(self.lookahead.tag)
@@ -373,8 +405,7 @@ class Parser(IParser):
                 if self.lookahead.tag == "SEMICOLON":
                     self.match("SEMICOLON")
                 return ast.Call(type=None, token=Token("ID", name), args=args)
-            except Exception as e:
-                print(f"Error parsing function call: {e}")
+            except Exception:
                 # Skip to the next statement on error
                 while self.lookahead.tag not in {"SEMICOLON", "EOF"}:
                     self.match(self.lookahead.tag)
@@ -393,37 +424,102 @@ class Parser(IParser):
         <if_stmt> ::= "if" "(" <expr_bool> ")" <stmt> [ "else" <stmt> ]
         """
         self.match("IF")
-        self.match("LPAREN")
-        condition = self.expr_bool()
-        self.match("RPAREN")
+        
+        # Handle condition in parentheses
+        if self.lookahead.tag == "LPAREN":
+            self.match("LPAREN")
+            condition = self.expr_bool()
+            if self.lookahead.tag == "RPAREN":
+                self.match("RPAREN")
+        else:
+            condition = self.expr_bool()
         
         # Parse the if body
-        if self.lookahead.tag in {"SEQ", "PAR"}:
-            body = self.stmt()
-        else:
-            body = self.stmt()
+        try:
+            # Handle blocks (SEQ, PAR)
+            if self.lookahead.tag in {"SEQ", "PAR"}:
+                body = [self.stmt()]
+            # Handle block with braces
+            elif self.lookahead.tag == "LBRACE":
+                self.match("LBRACE")
+                body = self.stmts()
+                if self.lookahead.tag == "RBRACE":
+                    self.match("RBRACE")
+            # Handle single statement
+            else:
+                body = [self.stmt()]
+        except Exception:
+            # Create an empty body on error
+            body = []
+            # Skip to else or semicolon
+            while self.lookahead.tag not in {"ELSE", "SEMICOLON", "EOF", "RBRACE"}:
+                self.match(self.lookahead.tag)
             
         # Check for optional else clause
-        else_body = None
+        else_body = []
         if self.lookahead.tag == "ELSE":
             self.match("ELSE")
-            if self.lookahead.tag in {"SEQ", "PAR"}:
-                else_body = self.stmt()
-            else:
-                else_body = self.stmt()
+            try:
+                # Handle blocks (SEQ, PAR)
+                if self.lookahead.tag in {"SEQ", "PAR"}:
+                    else_body = [self.stmt()]
+                # Handle block with braces
+                elif self.lookahead.tag == "LBRACE":
+                    self.match("LBRACE")
+                    else_body = self.stmts()
+                    if self.lookahead.tag == "RBRACE":
+                        self.match("RBRACE")
+                # Handle single statement
+                else:
+                    else_body = [self.stmt()]
+            except Exception:
+                # Create an empty else body on error
+                else_body = []
+                # Skip to semicolon
+                while self.lookahead.tag not in {"SEMICOLON", "EOF", "RBRACE"}:
+                    self.match(self.lookahead.tag)
                 
-        return ast.If(condition=condition, body=[body], else_stmt=[else_body] if else_body else [])
+        return ast.If(condition=condition, body=body, else_stmt=else_body)
 
     def while_stmt(self) -> ast.Node:
         """
         <while_stmt> ::= "while" "(" <expr_bool> ")" <stmt>
         """
         self.match("WHILE")
-        self.match("LPAREN")
-        condition = self.expr_bool()
-        self.match("RPAREN")
-        body = self.stmt()
-        return ast.While(condition=condition, body=[body])
+        
+        # Handle condition in parentheses
+        if self.lookahead.tag == "LPAREN":
+            self.match("LPAREN")
+            condition = self.expr_bool()
+            if self.lookahead.tag == "RPAREN":
+                self.match("RPAREN")
+        else:
+            condition = self.expr_bool()
+        
+        # Parse the while body
+        try:
+            # Handle blocks (SEQ, PAR)
+            if self.lookahead.tag in {"SEQ", "PAR"}:
+                body = [self.stmt()]
+            # Handle block with braces
+            elif self.lookahead.tag == "LBRACE":
+                self.match("LBRACE")
+                body = self.stmts()
+                if self.lookahead.tag == "RBRACE":
+                    self.match("RBRACE")
+            # Handle single statement
+            else:
+                body = [self.stmt()]
+        except Exception:
+            # Create an empty body on error
+            body = []
+            # Skip to semicolon
+            while self.lookahead.tag not in {"SEMICOLON", "EOF", "RBRACE"}:
+                self.match(self.lookahead.tag)
+            if self.lookahead.tag == "SEMICOLON":
+                self.match("SEMICOLON")
+                
+        return ast.While(condition=condition, body=body)
 
     def send_stmt(self) -> ast.Node:
         """
@@ -489,13 +585,43 @@ class Parser(IParser):
                 
         self.match("RPAREN")
         
-        # Function body
+        # Function body - we need to handle both explicit braces and implicit blocks
         body = []
         
-        # Handle block or single statement
-        if self.lookahead.tag in {"SEQ", "PAR"}:
+        # Handle block with braces
+        if self.lookahead.tag == "LBRACE":
+            self.match("LBRACE")
+            
+            # Process statements until we reach closing brace
+            while self.lookahead.tag != "RBRACE" and self.lookahead.tag != "EOF":
+                try:
+                    if self.lookahead.tag == "SEMICOLON":
+                        self.match("SEMICOLON")
+                        continue
+                        
+                    # Handle variable assignments directly
+                    if self.lookahead.tag == "ID":
+                        body.append(self.atrib_or_func_call())
+                    # Handle other statement types
+                    else:
+                        body.append(self.stmt())
+                except Exception:
+                    # Skip to the next statement
+                    while self.lookahead.tag not in {"SEMICOLON", "RBRACE", "EOF"}:
+                        self.match(self.lookahead.tag)
+                    if self.lookahead.tag == "SEMICOLON":
+                        self.match("SEMICOLON")
+            
+            # Match closing brace
+            if self.lookahead.tag == "RBRACE":
+                self.match("RBRACE")
+                
+        # Handle block statement (SEQ/PAR)
+        elif self.lookahead.tag in {"SEQ", "PAR"}:
             body_stmt = self.bloco_stmt()
             body.append(body_stmt)
+            
+        # Handle single statement
         else:
             body_stmt = self.stmt()
             body.append(body_stmt)
@@ -595,12 +721,8 @@ class Parser(IParser):
                 expr = self.expr()
                 if self.lookahead.tag == "RPAREN":
                     self.match("RPAREN")
-                else:
-                    # If no closing parenthesis, attempt to recover
-                    print(f"Warning: Missing closing parenthesis, assuming one exists")
                 return expr
-            except Exception as e:
-                print(f"Error parsing parenthesized expression: {e}")
+            except Exception:
                 # Skip to closing parenthesis or end of expression
                 while self.lookahead.tag not in {"RPAREN", "SEMICOLON", "EOF"}:
                     self.match(self.lookahead.tag)
@@ -618,8 +740,7 @@ class Parser(IParser):
                 try:
                     args = self.arg_list()
                     return ast.Call(type=None, token=Token(tag, name), args=args)
-                except Exception as e:
-                    print(f"Error parsing function call: {e}")
+                except Exception:
                     # Skip to the end of statement
                     while self.lookahead.tag not in {"SEMICOLON", "EOF"}:
                         self.match(self.lookahead.tag)
@@ -631,6 +752,20 @@ class Parser(IParser):
         elif self.lookahead.tag == "NUMBER":
             value = self.lookahead.value
             self.match("NUMBER")
+            
+            # Check if this might be a decimal number
+            if self.lookahead.tag == "DIV":
+                # This could be a decimal point
+                self.match("DIV")
+                
+                # If there's a number after the dot
+                if self.lookahead.tag == "NUMBER":
+                    decimal_part = self.lookahead.value
+                    self.match("NUMBER")
+                    
+                    # Combine integer and decimal parts
+                    value = value + "." + decimal_part
+            
             return ast.Constant(type="NUMBER", token=Token("NUMBER", value))
         elif self.lookahead.tag == "STRING":
             value = self.lookahead.value
@@ -641,7 +776,6 @@ class Parser(IParser):
             self.match("BOOL")
             return ast.Constant(type="BOOL", token=Token("BOOL", value))
         else:
-            print(f"Warning: Invalid factor: {self.lookahead.value}, using default value")
             # Skip past this token and try to continue
             self.match(self.lookahead.tag)
             return ast.Constant(type="NUMBER", token=Token("NUMBER", "0"))

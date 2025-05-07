@@ -1,4 +1,4 @@
-SEQ
+SEQ {
 # Produtos codificados em vetor binário (1 se comprado, 0 se não)
 smartphone = 1;
 jeans = 1;
@@ -21,17 +21,18 @@ fantasia = 0;
 # Pesos da rede (camada oculta de tamanho 4, apenas 1 exemplo de ativação)
 # Todos pesos = 0.5 e bias = 0.5
 # Exemplo com 4 neurônios ocultos e 16 entradas (produtos totais)
-h1 = smartphone*0.5 + jeans*0.5 + microondas*0.5 + ficcao*0.5 + 0.5;
-h2 = smartphone*0.5 + jeans*0.5 + microondas*0.5 + ficcao*0.5 + 0.5;
-h3 = smartphone*0.5 + jeans*0.5 + microondas*0.5 + ficcao*0.5 + 0.5;
-h4 = smartphone*0.5 + jeans*0.5 + microondas*0.5 + ficcao*0.5 + 0.5;
+h1 = smartphone * 0.5 + jeans * 0.5 + microondas * 0.5 + ficcao * 0.5 + 0.5;
+h2 = smartphone * 0.5 + jeans * 0.5 + microondas * 0.5 + ficcao * 0.5 + 0.5;
+h3 = smartphone * 0.5 + jeans * 0.5 + microondas * 0.5 + ficcao * 0.5 + 0.5;
+h4 = smartphone * 0.5 + jeans * 0.5 + microondas * 0.5 + ficcao * 0.5 + 0.5;
 
 # Ativação ReLU
 function relu(x) {
     if (x > 0) {
-    return x;
-}
-    else return 0;
+        return x;
+    } else {
+        return 0;
+    }
 }
 
 a1 = relu(h1);
@@ -45,11 +46,11 @@ function sigmoid(x) {
 }
 
 # Cada produto recebe um "score"
-score_laptop = sigmoid(a1*0.5 + a2*0.5 + a3*0.5 + a4*0.5 + 0.5);
-score_tablet = sigmoid(a1*0.5 + a2*0.5 + a3*0.5 + a4*0.5 + 0.5);
-score_camisa = sigmoid(a1*0.5 + a2*0.5 + a3*0.5 + a4*0.5 + 0.5);
-score_geladeira = sigmoid(a1*0.5 + a2*0.5 + a3*0.5 + a4*0.5 + 0.5);
-score_fantasia = sigmoid(a1*0.5 + a2*0.5 + a3*0.5 + a4*0.5 + 0.5);
+score_laptop = sigmoid(a1 * 0.5 + a2 * 0.5 + a3 * 0.5 + a4 * 0.5 + 0.5);
+score_tablet = sigmoid(a1 * 0.5 + a2 * 0.5 + a3 * 0.5 + a4 * 0.5 + 0.5);
+score_camisa = sigmoid(a1 * 0.5 + a2 * 0.5 + a3 * 0.5 + a4 * 0.5 + 0.5);
+score_geladeira = sigmoid(a1 * 0.5 + a2 * 0.5 + a3 * 0.5 + a4 * 0.5 + 0.5);
+score_fantasia = sigmoid(a1 * 0.5 + a2 * 0.5 + a3 * 0.5 + a4 * 0.5 + 0.5);
 
 # Mostrar os recomendados se score > 0.5 e ainda não comprado
 if (score_laptop > 0.5 && laptop == 0) {
@@ -66,4 +67,5 @@ if (score_geladeira > 0.5 && geladeira == 0) {
 }
 if (score_fantasia > 0.5 && fantasia == 0) {
     output("Fantasia");
+}
 }

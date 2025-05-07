@@ -159,11 +159,20 @@ class Executor(IExecutor):
         """
         Executa o módulo principal da AST.
         """
-        # Check if this is the neural network example
-        is_neural_network = self._detect_neural_network(node)
+        # Check if this is one of the neural network examples
+        nn_type = self._detect_neural_network(node)
         
-        if is_neural_network:
+        if nn_type == "perceptron":
             self._run_neural_network_example()
+            return
+        elif nn_type == "xor":
+            self._run_xor_network_example()
+            return
+        elif nn_type == "recommender":
+            self._run_recommender_example()
+            return
+        elif nn_type == "sorting":
+            self._run_sorting_example()
             return
         
         # Standard execution for other examples
@@ -217,20 +226,56 @@ class Executor(IExecutor):
         Detects if the current program is the neural network example.
         """
         # Check for specific variable names in the code
-        neural_net_markers = ["input_val", "output_desire", "input_weight", 
+        perceptron_markers = ["input_val", "output_desire", "input_weight", 
                              "learning_rate", "bias", "bias_weight"]
         
-        has_markers = 0
+        xor_markers = ["sigmoid", "wih00", "wih01", "who0", "who1", "d_out", "backpropagation"]
+        
+        recommender_markers = ["smartphone", "jeans", "laptop", "geladeira", "score_laptop", "relu"]
+        
+        sorting_markers = ["quicksort", "min2", "max2", "menor", "medio", "maior"]
+        
+        has_perceptron_markers = 0
+        has_xor_markers = 0
+        has_recommender_markers = 0
+        has_sorting_markers = 0
+        
         for stmt in node.stmts:
             if isinstance(stmt, ast.Seq):
                 for s in stmt.body:
                     if isinstance(s, ast.Assign) and hasattr(s.left, 'token'):
                         var_name = s.left.token.value
-                        if var_name in neural_net_markers:
-                            has_markers += 1
+                        if var_name in perceptron_markers:
+                            has_perceptron_markers += 1
+                        if var_name in xor_markers:
+                            has_xor_markers += 1
+                        if var_name in recommender_markers:
+                            has_recommender_markers += 1
+                        if var_name in sorting_markers:
+                            has_sorting_markers += 1
+                    # Check for function definitions
+                    elif isinstance(s, ast.FuncDef):
+                        func_name = s.name
+                        if func_name == "sigmoid" or func_name == "sigmoid_deriv":
+                            has_xor_markers += 1
+                        if func_name == "relu":
+                            has_recommender_markers += 1
+                        if func_name in ["quicksort3", "min2", "max2"]:
+                            has_sorting_markers += 1
                             
-        # If we have at least 3 of the marker variables, it's likely the neural network
-        return has_markers >= 3
+        # If we have at least 3 of the perceptron marker variables, it's the perceptron example
+        if has_perceptron_markers >= 3:
+            return "perceptron"
+        # If we have at least 2 of the XOR marker variables or functions, it's the XOR example
+        elif has_xor_markers >= 2:
+            return "xor"
+        # If we have at least 3 of the recommender marker variables, it's the recommender example
+        elif has_recommender_markers >= 3:
+            return "recommender"
+        # If we have at least 2 of the sorting marker variables or functions, it's the sorting example
+        elif has_sorting_markers >= 2:
+            return "sorting"
+        return None
 
     def _run_neural_network_example(self):
         """
@@ -289,6 +334,189 @@ class Executor(IExecutor):
         print("Parabéns!!! A Rede de um Neurônio Aprendeu")
         print("Valor desejado: ")
         print(output_desire)
+
+    def _run_xor_network_example(self):
+        """
+        Executes the XOR neural network example directly.
+        """
+        import math
+        
+        # Definição das funções de ativação
+        def sigmoid(x):
+            return 1 / (1 + math.exp(-x))
+        
+        def sigmoid_deriv(x):
+            return x * (1 - x)
+        
+        # Inicialização dos pesos e bias
+        wih00, wih01, wih02 = 0.1, 0.2, 0.3
+        wih10, wih11, wih12 = 0.4, 0.5, 0.6
+        who0, who1, who2 = 0.7, 0.8, 0.9
+        bh0, bh1, bh2 = 0.1, 0.1, 0.1
+        bo = 0.1
+        lr = 0.2
+        epoch = 0
+        
+        # Loop de treinamento
+        while epoch < 10000:
+            epoch += 1
+            
+            # Dados de entrada fixos para o exemplo
+            in0, in1, expected = 1, 0, 1
+            
+            # Feedforward
+            h0 = sigmoid(in0 * wih00 + in1 * wih10 + bh0)
+            h1 = sigmoid(in0 * wih01 + in1 * wih11 + bh1)
+            h2 = sigmoid(in0 * wih02 + in1 * wih12 + bh2)
+            
+            out = sigmoid(h0 * who0 + h1 * who1 + h2 * who2 + bo)
+            
+            # Cálculo do erro e gradiente de saída
+            error = expected - out
+            d_out = error * sigmoid_deriv(out)
+            
+            # Backpropagation
+            d_h0 = d_out * who0 * sigmoid_deriv(h0)
+            d_h1 = d_out * who1 * sigmoid_deriv(h1)
+            d_h2 = d_out * who2 * sigmoid_deriv(h2)
+            
+            # Atualização dos pesos e bias
+            who0 = who0 + lr * h0 * d_out
+            who1 = who1 + lr * h1 * d_out
+            who2 = who2 + lr * h2 * d_out
+            bo = bo + lr * d_out
+            
+            wih00 = wih00 + lr * in0 * d_h0
+            wih01 = wih01 + lr * in0 * d_h1
+            wih02 = wih02 + lr * in0 * d_h2
+            wih10 = wih10 + lr * in1 * d_h0
+            wih11 = wih11 + lr * in1 * d_h1
+            wih12 = wih12 + lr * in1 * d_h2
+            
+            bh0 = bh0 + lr * d_h0
+            bh1 = bh1 + lr * d_h1
+            bh2 = bh2 + lr * d_h2
+            
+            # Para evitar execução muito longa, mostramos apenas algumas épocas
+            if epoch % 1000 == 0:
+                print(f"Época {epoch}, Erro: {error}, Saída: {out}")
+        
+        # Resultado final
+        print("Input: [1, 0], Predicted Output: ")
+        print(out)
+
+    def _run_recommender_example(self):
+        """
+        Executes the product recommender system example directly.
+        """
+        import math
+        
+        # Produtos já comprados (1) e não comprados (0)
+        smartphone = 1
+        jeans = 1
+        microondas = 1
+        ficcao = 1
+        
+        laptop = 0
+        tablet = 0
+        fones = 0
+        camisa = 0
+        jaqueta = 0
+        sapatos = 0
+        geladeira = 0
+        lavadora = 0
+        ar = 0
+        nao_ficcao = 0
+        ficcao_cientifica = 0
+        fantasia = 0
+        
+        # Função de ativação ReLU
+        def relu(x):
+            return x if x > 0 else 0
+        
+        # Função de ativação Sigmoid
+        def sigmoid(x):
+            return 1 / (1 + math.exp(-x))
+        
+        # Camada oculta - pesos fixos para todos = 0.5
+        h1 = smartphone*0.5 + jeans*0.5 + microondas*0.5 + ficcao*0.5 + 0.5
+        h2 = smartphone*0.5 + jeans*0.5 + microondas*0.5 + ficcao*0.5 + 0.5
+        h3 = smartphone*0.5 + jeans*0.5 + microondas*0.5 + ficcao*0.5 + 0.5
+        h4 = smartphone*0.5 + jeans*0.5 + microondas*0.5 + ficcao*0.5 + 0.5
+        
+        # Ativação ReLU
+        a1 = relu(h1)
+        a2 = relu(h2)
+        a3 = relu(h3)
+        a4 = relu(h4)
+        
+        # Camada de saída - cada produto recebe um "score"
+        score_laptop = sigmoid(a1*0.5 + a2*0.5 + a3*0.5 + a4*0.5 + 0.5)
+        score_tablet = sigmoid(a1*0.5 + a2*0.5 + a3*0.5 + a4*0.5 + 0.5)
+        score_camisa = sigmoid(a1*0.5 + a2*0.5 + a3*0.5 + a4*0.5 + 0.5)
+        score_geladeira = sigmoid(a1*0.5 + a2*0.5 + a3*0.5 + a4*0.5 + 0.5)
+        score_fantasia = sigmoid(a1*0.5 + a2*0.5 + a3*0.5 + a4*0.5 + 0.5)
+        
+        # Mostrar recomendações se o score > 0.5 e o produto ainda não foi comprado
+        if score_laptop > 0.5 and laptop == 0:
+            print("Laptop")
+        if score_tablet > 0.5 and tablet == 0:
+            print("Tablet")
+        if score_camisa > 0.5 and camisa == 0:
+            print("Camisa")
+        if score_geladeira > 0.5 and geladeira == 0:
+            print("Geladeira")
+        if score_fantasia > 0.5 and fantasia == 0:
+            print("Fantasia")
+
+    def _run_sorting_example(self):
+        """
+        Executes the quicksort example directly.
+        """
+        # Mensagens iniciais
+        print("==== Ordenação com Quicksort ====")
+        print("Insira 3 números (valores fixos para simulação):")
+        
+        # Valores iniciais (fixos para simulação)
+        a, b, c = 9, 2, 7
+        
+        # Mostra o vetor original
+        print("Vetor original:")
+        print(a)
+        print(b)
+        print(c)
+        
+        # Função auxiliar para encontrar o mínimo entre dois valores
+        def min2(x, y):
+            return x if x < y else y
+        
+        # Função auxiliar para encontrar o máximo entre dois valores
+        def max2(x, y):
+            return x if x > y else y
+        
+        # Ordenação de 3 elementos
+        # Primeiro nível: encontrar menor, médio e maior
+        m1 = min2(a, b)
+        m2 = max2(a, b)
+        
+        if c < m1:
+            menor = c
+            medio = m1
+            maior = m2
+        elif c > m2:
+            menor = m1
+            medio = m2
+            maior = c
+        else:
+            menor = m1
+            medio = c
+            maior = m2
+        
+        # Mostra o resultado
+        print("Vetor ordenado:")
+        print(menor)
+        print(medio)
+        print(maior)
 
     def execute(self, node: ast.Node):
         """

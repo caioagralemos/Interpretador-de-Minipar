@@ -1,4 +1,4 @@
-SEQ
+SEQ {
 # Funções auxiliares
 function sigmoid(x) {
     return 1 / (1 + exp(-x));
@@ -19,10 +19,18 @@ output2 = 1;
 output3 = 0;
 
 # Pesos e bias (inicialização estática)
-wih00 = 0.1; wih01 = 0.2; wih02 = 0.3;
-wih10 = 0.4; wih11 = 0.5; wih12 = 0.6;
-who0 = 0.7; who1 = 0.8; who2 = 0.9;
-bh0 = 0.1; bh1 = 0.1; bh2 = 0.1;
+wih00 = 0.1;
+wih01 = 0.2;
+wih02 = 0.3;
+wih10 = 0.4;
+wih11 = 0.5;
+wih12 = 0.6;
+who0 = 0.7;
+who1 = 0.8;
+who2 = 0.9;
+bh0 = 0.1;
+bh1 = 0.1;
+bh2 = 0.1;
 bo = 0.1;
 lr = 0.2;
 epoch = 0;
@@ -32,7 +40,9 @@ while (epoch < 10000) {
     epoch = epoch + 1;
 
     # Input fixo: [1, 0] -> output = 1
-    in0 = 1; in1 = 0; expected = 1;
+    in0 = 1;
+    in1 = 0;
+    expected = 1;
 
     # Feedforward
     h0 = sigmoid(in0 * wih00 + in1 * wih10 + bh0);
@@ -71,3 +81,4 @@ while (epoch < 10000) {
 # Teste final
 output("Input: [1, 0], Predicted Output: ");
 output(out);
+}
